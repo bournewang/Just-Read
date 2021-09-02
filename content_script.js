@@ -5,6 +5,13 @@ let isPremium = false;
 let jrSecret;
 let jrOpenCount;
 
+let chromeStorage, pageSelectedContainer;
+chrome.storage.sync.get(null, function (result) {
+    chromeStorage = result;
+
+    launch();
+});
+
 
 /////////////////////////////////////
 // Generic helper functions
@@ -66,6 +73,7 @@ function stylesheetToString(s) {
 }
 
 // Select text from highlight functionality
+const selection = getSelectionHtml();
 function getSelectionHtml() {
     let html = "";
     const sel = window.getSelection();
@@ -77,14 +85,6 @@ function getSelectionHtml() {
         html = container.innerHTML;
     }
     return html;
-}
-
-// Use the highlighted text if started from that
-let pageSelectedContainer;
-if(typeof textToRead !== "undefined" && textToRead) {
-    pageSelectedContainer = document.createElement("div");
-    pageSelectedContainer.className = "highlighted-html";
-    pageSelectedContainer.innerHTML = getSelectionHtml();
 }
 
 
@@ -115,7 +115,7 @@ function startSelectElement(doc) {
     },
     escFunc = function(e) {
         // Listen for the "Esc" key and exit if so
-        if(e.keyCode === 27)
+        if(e.key === "Escape")
             exitFunc();
     },
     exitFunc = function() {
@@ -144,9 +144,6 @@ function startSelectElement(doc) {
     tempStyle.innerText = ".jr-hovered, .jr-hovered * { cursor: pointer !important; color: black !important; background-color: #2095f2 !important; }";
 
     doc.head.appendChild(tempStyle);
-
-    // Make the next part wait until a user has selected an element to use
-    useText = false;
 }
 
 // Similar to ^^ but for deletion once the article is open
@@ -209,7 +206,7 @@ function startDeleteElement(doc) {
     },
     escFunc = function(e) {
         // Listen for the "Esc" key and exit if so
-        if(e.keyCode === 27)
+        if(e.key === "Escape")
             exitFunc();
     },
     exitFunc = function() {
@@ -650,9 +647,9 @@ function closeOverlay() {
     // Reset our variables
     pageSelectedContainer = null;
     userSelected = null;
-    textToRead = null;
     simpleArticleIframe = undefined;
     editBar = undefined;
+    chromeStorage = undefined;
 
     setTimeout(function() {
         // Enable scroll
@@ -807,45 +804,38 @@ function isContentElem(elem) {
 // Extension-related adder functions
 /////////////////////////////////////
 
-// Get theme's CSS sheets from storage
-let chromeStorage;
-function getStyles() {
-    // Check to see if the stylesheets are already in Chrome storage
-    chrome.storage.sync.get(null, function (result) {
-        chromeStorage = result;
+function checkPremium() {
+    // Check if premium
+    if(chromeStorage.jrSecret
+    // Limit API calls on open to just 1 per day
+    && (typeof chromeStorage.jrLastChecked === "undefined" || chromeStorage.jrLastChecked === "" || Date.now() - chromeStorage.jrLastChecked > 86400000)
+    ) {
+        chrome.storage.sync.set({'jrLastChecked': Date.now()});
 
-        // Check if premium
-        if(chromeStorage.jrSecret
-        // Limit API calls on open to just 1 per day
-        && (typeof chromeStorage.jrLastChecked === "undefined" || chromeStorage.jrLastChecked === "" || Date.now() - chromeStorage.jrLastChecked > 86400000)
-        ) {
-            chrome.storage.sync.set({'jrLastChecked': Date.now()});
-
-            jrSecret = chromeStorage.jrSecret;
-            fetch(jrDomain + "checkPremium", {
-                mode: 'cors',
-                method: 'POST',
-                headers: { "Content-type": "application/json; charset=UTF-8" },
-                body: JSON.stringify({
-                    'jrSecret': jrSecret
-                })
+        jrSecret = chromeStorage.jrSecret;
+        fetch(jrDomain + "checkPremium", {
+            mode: 'cors',
+            method: 'POST',
+            headers: { "Content-type": "application/json; charset=UTF-8" },
+            body: JSON.stringify({
+                'jrSecret': jrSecret
             })
-            .then(function(response) {
-                if (!response.ok) throw response;
-                else return response.text();
-            })
-            .then(response => {
-                isPremium = response === "true";
-                chrome.storage.sync.set({'isPremium': isPremium});
-                afterPremium();
-            })
-            .catch((err) => console.error(`Fetch Error =\n`, err));
-        } else {
-            isPremium = chromeStorage.isPremium ? chromeStorage.isPremium : false;
-            jrSecret = chromeStorage.jrSecret ? chromeStorage.jrSecret : false;
+        })
+        .then(function(response) {
+            if (!response.ok) throw response;
+            else return response.text();
+        })
+        .then(response => {
+            isPremium = response === "true";
+            chrome.storage.sync.set({'isPremium': isPremium});
             afterPremium();
-        }
-    });
+        })
+        .catch((err) => console.error(`Fetch Error =\n`, err));
+    } else {
+        isPremium = chromeStorage.isPremium ? chromeStorage.isPremium : false;
+        jrSecret = chromeStorage.jrSecret ? chromeStorage.jrSecret : false;
+        afterPremium();
+    }
 }
 
 function afterPremium() {
@@ -869,7 +859,7 @@ function afterPremium() {
 
         // Open the default CSS file and save it to our object
         let xhr = new XMLHttpRequest();
-        xhr.open('GET', chrome.extension.getURL('default-styles.css'), true);
+        xhr.open('GET', chrome.runtime.getURL('default-styles.css'), true);
         xhr.onreadystatechange = function() {
             if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200) {
                 // Save the file's contents to our object
@@ -885,7 +875,7 @@ function afterPremium() {
         xhr.send();
 
         let xhr2 = new XMLHttpRequest();
-        xhr2.open('GET', chrome.extension.getURL('dark-styles.css'), true);
+        xhr2.open('GET', chrome.runtime.getURL('dark-styles.css'), true);
         xhr2.onreadystatechange = function() {
             if(xhr2.readyState == XMLHttpRequest.DONE && xhr2.status == 200) {
                 // Save the file's contents to our object
@@ -907,7 +897,7 @@ function afterPremium() {
 
 // Add our styles to the page
 function addStylesheet(doc, link, classN) {
-    const path = chrome.extension.getURL(link),
+    const path = chrome.runtime.getURL(link),
           styleLink = document.createElement("link");
 
     styleLink.setAttribute("rel", "stylesheet");
@@ -1095,7 +1085,7 @@ function editText(elem) {
 
         // Allow enter to be used to save the edit
         textInput.onkeydown = function(e) {
-            if(e.keyCode === 13)
+            if(e.key === "Enter")
                 textInput.blur();
         }
 
@@ -1849,9 +1839,7 @@ function getLineInfo(target, computedStyle) {
 }
 
 // JS functionality to allow more precision/dynamic results for above SCSS
-let useGradText = false;
 function gradientText(colors) {
-    useGradText = true;
     const ps = simpleArticleIframe.querySelectorAll(".content-container p");
 
     ps.forEach(p => {
@@ -1938,7 +1926,7 @@ function initFindBar() {
 
     findInput.addEventListener("keydown", function(e) {
         // Esc
-        if(e.keyCode === 27) {
+        if(e.key === "Escape") {
             closeFindBar();
             e.stopPropagation();
         }
@@ -2714,26 +2702,26 @@ function createSimplifiedOverlay() {
 
         simpleArticleIframe.onkeydown = function(e) {
             // Listen for the "Esc" key and exit if so
-            if(e.keyCode === 27 && !simpleArticleIframe.body.classList.contains("simple-deleting") && document.hasFocus())
+            if(e.key === "Escape" && !simpleArticleIframe.body.classList.contains("simple-deleting") && document.hasFocus())
                 closeOverlay();
 
             // Listen for CTRL/CMD + SHIFT + ; and allow node deletion if so
-            if(e.keyCode === 186 && (e.ctrlKey || e.metaKey) && e.shiftKey)
+            if(e.key === ";" && (e.ctrlKey || e.metaKey) && e.shiftKey)
                 startDeleteElement(simpleArticleIframe);
 
             // Listen for CTRL/CMD + P and do our print function if so
-            if((e.ctrlKey || e.metaKey) && e.keyCode === 80) {
+            if((e.ctrlKey || e.metaKey) && e.key === "p") {
                 simpleArticleIframe.defaultView.print();
                 e.preventDefault();
             }
 
             // Listen for CTRL/CMD + Z for our undo function
-            if((e.ctrlKey || e.metaKey) && e.keyCode === 90) {
+            if((e.ctrlKey || e.metaKey) && e.key === "z") {
                 popStack();
             }
 
             // Listen for CTRL/CMD + F or F3
-            if(e.keyCode === 114 || ((e.ctrlKey || e.metaKey) && e.keyCode === 70)) {
+            if(e.key === "F3" || ((e.ctrlKey || e.metaKey) && e.key === "f")) {
                 find.classList.add("active");
                 findInput.focus();
                 e.preventDefault();
@@ -2742,47 +2730,47 @@ function createSimplifiedOverlay() {
             // Listen for editor shortcuts
             if(editorShortcutsEnabled) {
                 // CTRL/CMD + B
-                if((e.ctrlKey || e.metaKey) && e.keyCode === 66) {
+                if((e.ctrlKey || e.metaKey) && e.key === "b") {
                     bolden();
                 }
 
                 // CTRL/CMD + I
-                if((e.ctrlKey || e.metaKey) && e.keyCode === 73) {
+                if((e.ctrlKey || e.metaKey) && e.key === "i") {
                     italicize();
                 }
 
                 // CTRL + U
-                if((e.ctrlKey || e.metaKey) && e.keyCode === 85) {
+                if((e.ctrlKey || e.metaKey) && e.key === "u") {
                     underline();
                     e.preventDefault();
                 }
 
                 // CTRL/CMD + SHIFT + S
-                if((e.ctrlKey || e.metaKey) && e.shiftKey && e.keyCode === 83) {
+                if((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "s") {
                     strikeThrough();
                     e.preventDefault();
                 }
 
                 // CTRL/CMD + SHIFT + D
-                if((e.ctrlKey || e.metaKey) && e.shiftKey && e.keyCode === 68) {
+                if((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "d") {
                     deleteSelection();
                     e.preventDefault();
                 }
 
                 // CTRL/CMD + SHIFT + C
-                if((e.ctrlKey || e.metaKey) && e.shiftKey && e.keyCode === 67) {
+                if((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "c") {
                     colorSelectedText(lastFontColor);
                     e.preventDefault();
                 }
 
                 // CTRL/CMD + SHIFT + H
-                if((e.ctrlKey || e.metaKey) && e.shiftKey && e.keyCode === 72) {
+                if((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "h") {
                     highlightSelectedText(lastHighlightColor);
                     e.preventDefault();
                 }
 
                 // CTRL/CMD + \
-                if((e.ctrlKey || e.metaKey) && e.keyCode === 220) {
+                if((e.ctrlKey || e.metaKey) && e.key === "\\") {
                     removeHighlightFromSelectedText();
                     e.preventDefault();
                 }
@@ -2937,11 +2925,18 @@ const stylesheetObj = {},
       stylesheetVersion = 4.0; // THIS NUMBER MUST BE UPDATED FOR THE STYLESHEETS TO KNOW TO UPDATE
 
 function launch() {
+    // Use the highlighted text if started from that
+    if(chromeStorage.textToRead) {
+        pageSelectedContainer = document.createElement("div");
+        pageSelectedContainer.className = "highlighted-html";
+        pageSelectedContainer.innerHTML = selection;
+    }
+
     // Detect past overlay - don't show another
     if(document.getElementById("simple-article") == null) {
-
+        
         // Check to see if the user wants to select the text
-        if(typeof useText !== "undefined" && useText) {
+        if(chromeStorage.useText) {
             // Start the process of the user selecting text to read
             startSelectElement(document);
         } else {
@@ -2950,20 +2945,17 @@ function launch() {
                 addStylesheet(document, "page.css", "page-styles");
 
             // Check to see if the user wants to hide the content while loading
-            if(typeof runOnLoad !== "undefined" && runOnLoad) {
-                window.onload = getStyles();
+            if(chromeStorage.runOnLoad) {
+                window.onload = checkPremium();
             } else {
-                getStyles();
+                checkPremium();
             }
         }
-
     } else {
         if(document.querySelector(".simple-fade-up") == null) // Make sure it's been able to load
             closeOverlay();
     }
 }
-// Assure our libraries have time to load before launching
-setTimeout(launch, 10);
 
 
 

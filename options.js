@@ -129,7 +129,7 @@ function setStylesOfStorage(nextFunc) {
         chrome.storage.sync.set(obj, function() {
             if(chrome.runtime.lastError
             && chrome.runtime.lastError.message === "QUOTA_BYTES_PER_ITEM quota exceeded") {
-                chrome.extension.getBackgroundPage().alert("File did not save: Your stylesheet is too big. Minifying it or removing lesser-used entries may help.\n\nYou can minify it at: https://cssminifier.com/");
+                chrome.runtime.getBackgroundPage().alert("File did not save: Your stylesheet is too big. Minifying it or removing lesser-used entries may help.\n\nYou can minify it at: https://cssminifier.com/");
             } else {
                 if(nextFunc)
                     nextFunc();
@@ -213,7 +213,7 @@ function rename() {
 
     // Allow enter to be used to save the rename
     fileNameInput.onkeyup = function(e) {
-        if(e.keyCode === 13)
+        if(e.key === "Enter")
             fileNameInput.onblur();
     }
 
@@ -230,7 +230,7 @@ function rename() {
 // Make sure the user wants to change files before saving
 function confirmChange() {
     if(changed)
-        if (chrome.extension.getBackgroundPage().confirm("Do you really want to change files before saving?"))
+        if (chrome.runtime.getBackgroundPage().confirm("Do you really want to change files before saving?"))
                 return false;
             else
                 return true;
@@ -268,7 +268,7 @@ function continueLoading() {
     if(typeof stylesheetObj[darkStylesheet] === "undefined") {
         // If the dark theme isn't found, add it
         const xhr = new XMLHttpRequest();
-        xhr.open('GET', chrome.extension.getURL(darkStylesheet), true);
+        xhr.open('GET', chrome.runtime.getURL(darkStylesheet), true);
         xhr.onreadystatechange = function() {
             if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200) {
                 // Save the file's contents to our object
@@ -384,7 +384,7 @@ function getStylesheets() {
         if(isEmpty(stylesheetObj)) { // Not found, so we add our default
             // Open the default CSS file and save it to our object
             const xhr = new XMLHttpRequest();
-            xhr.open('GET', chrome.extension.getURL(defaultStylesheet), true);
+            xhr.open('GET', chrome.runtime.getURL(defaultStylesheet), true);
             xhr.onreadystatechange = function() {
                 if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200) {
                     // Save the file's contents to our object
@@ -500,7 +500,7 @@ function addEventListeners() {
 
     // Allow the "Enter" key to be used to add new stylesheets
     newFileInput.onkeyup = function(e) {
-        if(e.keyCode === 13)
+        if(e.key === "Enter")
             add.onclick();
     }
 
@@ -561,7 +561,7 @@ function addEventListeners() {
         // Make sure they can't delete locked files
         if(!elem.classList.contains("locked")) {
             // Add confimation
-            if (chrome.extension.getBackgroundPage().confirm("Do you really want to remove this file?")) {
+            if (chrome.runtime.getBackgroundPage().confirm("Do you really want to remove this file?")) {
                 // Remove the file from our object
                 delete stylesheetObj[document.querySelector(".stylesheets .active").innerText];
 
@@ -583,7 +583,7 @@ function addEventListeners() {
                 editor.setValue("", -1);
             }
         } else
-            chrome.extension.getBackgroundPage().alert("This file is locked and cannot be deleted.");
+            chrome.runtime.getBackgroundPage().alert("This file is locked and cannot be deleted.");
 
         // Otherwise we do nothing
     }

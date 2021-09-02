@@ -12,15 +12,27 @@ function checkArrayForString(arr, string) {
 }
 
 function startJustRead(tab) {
-    const tabId = tab ? tab.id : null; // Defaults to the current tab
-    chrome.tabs.executeScript(tabId, {
-        file: "content_script.js", // Script to inject into page and run in sandbox
-        allFrames: false // This injects script into iframes in the page and doesn't work before 4.0.266.0.
+    if(tab) {
+        continueJustRead(tab);
+    } else {
+        chrome.tabs.query({
+            active: true,
+            lastFocusedWindow: true
+        }, function(tabs) {
+            continueJustRead(tabs[0]);
+        });
+    }
+}
+
+function continueJustRead(tab) {
+    chrome.scripting.executeScript({
+        target: { tabId: tab.id, allFrames: false },
+        files: [ "content_script.js" ]
     });
 
     // Add a badge to signify the extension is in use
-    chrome.browserAction.setBadgeBackgroundColor({color:[242, 38, 19, 230]});
-    chrome.browserAction.setBadgeText({text:"on"});
+    chrome.action.setBadgeBackgroundColor({color:[242, 38, 19, 230]});
+    chrome.action.setBadgeText({text:"on"});
 
     // Check if we need to add the site to JR's autorun list
     chrome.storage.sync.get("alwaysAddAR", function(result) {
@@ -30,71 +42,49 @@ function startJustRead(tab) {
     });
 
     setTimeout(function() {
-        chrome.browserAction.setBadgeText({text:""});
+        chrome.action.setBadgeText({text: ""});
+        chrome.storage.sync.set({ 'useText': false });
+        chrome.storage.sync.set({ 'runOnLoad': false });
+        chrome.storage.sync.set({ 'textToRead': false });
     }, 2000);
 }
 
 function startSelectText() {
-    chrome.tabs.executeScript(null, {
-        code: 'var useText = true;' // Ghetto way of signaling to select text instead of
-    }, function() {                 // using Chrome messages
-        startJustRead();
-    });
+    chrome.storage.sync.set({ 'useText': true });
+    startJustRead();
 }
 
 function createPageCM() {
     // Create a right click menu option
     pageCMId = chrome.contextMenus.create({
-         title: "View this page using Just Read",
-         id: "pageCM",
-         contexts: ["page"],
-         onclick: startJustRead
-    });
+        title: "View this page using Just Read",
+        id: "pageCM",
+        contexts: ["page"]
+    }, () => chrome.runtime.lastError);
 }
 function createHighlightCM() {
     // Create an entry to allow user to use currently selected text
     highlightCMId = chrome.contextMenus.create({
         title: "View this selection in Just Read",
         id: "highlightCM",
-        contexts:["selection"],
-        onclick: function(info, tab) {
-            chrome.tabs.executeScript(null, {
-                code: 'var textToRead = true'
-            }, function() {
-                startJustRead();
-            });
-        }
-    });
+        contexts: ["selection"]
+    }, () => chrome.runtime.lastError);
 }
 function createLinkCM() {
     // Create an entry to allow user to open a given link using Just read
     linkCMId = chrome.contextMenus.create({
         title: "View the linked page using Just Read",
         id: "linkCM",
-        contexts:["link"],
-        onclick: function(info, tab) {
-            chrome.tabs.create(
-                { url: info.linkUrl, active: false },
-                function(newTab) {
-                    chrome.tabs.executeScript(newTab.id, {
-                        code: 'var runOnLoad = true'
-                    }, function() {
-                        startJustRead(newTab);
-                    });
-                }
-            );
-
-        }
-    });
+        contexts: ["link"]
+    }, () => chrome.runtime.lastError);
 }
 function createAutorunCM() {
     // Create an entry to allow user to open a given link using Just read
     autorunCMId = chrome.contextMenus.create({
         title: "Add this site to Just Read's auto-run list",
         id: "autorunCM",
-        contexts:["page"],
-        onclick: addSiteToAutorunList
-    });
+        contexts: ["page"]
+    }, () => chrome.runtime.lastError);
 }
 function addSiteToAutorunList(info, tab) {
     chrome.storage.sync.get('auto-enable-site-list', function(result) {
@@ -193,7 +183,7 @@ function updateCMs() {
 }
 
 // Listen for the extension's click
-chrome.browserAction.onClicked.addListener(startJustRead);
+chrome.action.onClicked.addListener(startJustRead);
 
 // Add our context menus
 updateCMs();
@@ -214,7 +204,11 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     } else if(request.updateCMs === "true") {
         updateCMs();
     } else if(request.closeTab === "true") {
-        chrome.tabs.getSelected(function(tab) {
+        chrome.tabs.query({
+            active: true,
+            lastFocusedWindow: true
+        }, function(tabs) {
+            const tab = tabs[0];
             setTimeout(function() { chrome.tabs.remove(tab.id) }, 100);
         });
     } else if(request.savedVersion) {
@@ -258,8 +252,28 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 chrome.contextMenus.create({
     title: "Select content to read",
     contexts: ["browser_action"],
-    onclick: function() {
+    id: "selectContentCM"
+}, () => chrome.runtime.lastError);
+
+chrome.contextMenus.onClicked.addListener(function(info, tab) {
+    if (info.menuItemId === "selectContentCM") {
         startSelectText();
+    } else if (info.menuItemId === "pageCM") {
+        startJustRead();
+    } else if (info.menuItemId === "highlightCM") {
+        chrome.storage.sync.set({ 'textToRead': true });
+        startJustRead();
+    } else if (info.menuItemId === "linkCM") {
+        // TODO fix? Bug currently prevents: https://bugs.chromium.org/p/chromium/issues/detail?id=1191971
+        chrome.tabs.create(
+            { url: info.linkUrl, active: false },
+            function(newTab) {
+                chrome.storage.sync.set({ 'runOnLoad': true });
+                startJustRead(newTab);
+            }
+        );
+    } else if (info.menuItemId === "autorunCM") {
+        addSiteToAutorunList();
     }
 });
 
@@ -278,11 +292,8 @@ chrome.tabs.onUpdated.addListener( function (tabId, changeInfo, tab) {
                         const regex = new RegExp(siteList[i], "i");
 
                         if( url.match( regex ) ) {
-                            chrome.tabs.executeScript(tabId, {
-                                code: 'var runOnLoad = true;' // Ghetto way of signaling to run on load
-                            }, function() {                   // instead of using Chrome messages
-                                startJustRead(tab);
-                            });
+                            chrome.storage.sync.set({ 'runOnLoad': true });
+                            startJustRead(tab);
                             return;
                         }
                     }
