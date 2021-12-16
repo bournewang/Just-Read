@@ -25,9 +25,17 @@ function startJustRead(tab) {
 }
 
 function continueJustRead(tab) {
+    // Load our external scripts, then our content script
     chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames: false },
-        files: [ "content_script.js" ]
+        files: [
+            "/external-libraries/datGUI/dat.gui.min.js",
+            "/external-libraries/DOMPurify/purify.min.js",
+            "/external-libraries/Rangy/rangy.min.js",
+            "/external-libraries/Rangy/rangy-classapplier.min.js",
+            "/external-libraries/Rangy/rangy-highlighter.min.js",
+            "/external-libraries/Rangy/rangy-textrange.min.js",
+            "content_script.js" ]
     });
 
     // Add a badge to signify the extension is in use
@@ -226,7 +234,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         if(lastSavedPage
         && sender.url === lastSavedPage.url) {
             if(lastSavedPage.savedComments) {
-                sendResponse({ 
+                sendResponse({
                     content: lastSavedPage.content,
                     savedComments: lastSavedPage.savedComments,
                     savedCompactComments: lastSavedPage.savedCompactComments
