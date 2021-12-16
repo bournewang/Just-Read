@@ -35,7 +35,8 @@ function continueJustRead(tab) {
             "/external-libraries/Rangy/rangy-classapplier.min.js",
             "/external-libraries/Rangy/rangy-highlighter.min.js",
             "/external-libraries/Rangy/rangy-textrange.min.js",
-            "content_script.js" ]
+            "content_script.js"
+        ]
     });
 
     // Add a badge to signify the extension is in use
