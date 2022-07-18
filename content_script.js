@@ -1,8 +1,8 @@
 (function () {
 
-const jrDomain = "https://justread.link/";
-let isPremium = false;
-let jrSecret;
+// const jrDomain = "https://justread.link/";
+let isPremium = true;
+// let jrSecret;
 let jrOpenCount;
 
 let chromeStorage, pageSelectedContainer;
@@ -791,37 +791,8 @@ function isContentElem(elem) {
 /////////////////////////////////////
 
 function checkPremium() {
-    // Check if premium
-    if(chromeStorage.jrSecret
-    // Limit API calls on open to just 1 per day
-    && (typeof chromeStorage.jrLastChecked === "undefined" || chromeStorage.jrLastChecked === "" || Date.now() - chromeStorage.jrLastChecked > 86400000)
-    ) {
-        chrome.storage.sync.set({'jrLastChecked': Date.now()});
-
-        jrSecret = chromeStorage.jrSecret;
-        fetch(jrDomain + "checkPremium", {
-            mode: 'cors',
-            method: 'POST',
-            headers: { "Content-type": "application/json; charset=UTF-8" },
-            body: JSON.stringify({
-                'jrSecret': jrSecret
-            })
-        })
-        .then(function(response) {
-            if (!response.ok) throw response;
-            else return response.text();
-        })
-        .then(response => {
-            isPremium = response === "true";
-            chrome.storage.sync.set({'isPremium': isPremium});
-            afterPremium();
-        })
-        .catch((err) => console.error(`Fetch Error =\n`, err));
-    } else {
-        isPremium = chromeStorage.isPremium ? chromeStorage.isPremium : false;
-        jrSecret = chromeStorage.jrSecret ? chromeStorage.jrSecret : false;
-        afterPremium();
-    }
+    chrome.storage.sync.set({'isPremium': isPremium});
+    afterPremium();
 }
 
 function afterPremium() {
@@ -2405,104 +2376,6 @@ function getContent(keepJR) {
     return copy;
 }
 
-
-// Duplicating content to make a savable copy
-let hasSavedLink = false,
-    alertTimeout;
-function getSavableLink() {
-    if(isPremium && jrSecret) {
-        if(!hasSavedLink) {
-            hasSavedLink = true;
-
-            let copy = getContent(true);
-
-            const myTitle = copy.querySelector(".simple-title") ? copy.querySelector(".simple-title").innerText : "Unknown title",
-                  myAuthor = copy.querySelector(".simple-author") ? copy.querySelector(".simple-author").innerText : "Unknown author";
-
-            const comments = copy.querySelectorAll(".simple-comment-container");
-            comments.forEach(comment => {
-                const timestamp = comment.querySelector(".jr-timestamp");
-
-                const timestampLink = document.createElement("a");
-                timestampLink.setAttribute("href", "#" + comment.id);
-                timestampLink.innerText = timestamp.innerText.split('Left on ').pop();
-
-                timestamp.innerText = "Left on ";
-                timestamp.appendChild(timestampLink);
-            });
-            // Hack to add hide segments to the actual content
-            if(hideSegments) {
-                let hideCSS = document.createElement("style");
-                hideCSS.innerText = '.content-container script,.content-container [class="ad"],.content-container [class *="ads"],.content-container [class ^="ad-"],.content-container [class ^="ad_"],.content-container [class *="-ad-"],.content-container [class $="-ad"],.content-container [class $="_ad"],.content-container [class ~="ad"],.content-container [class *="navigation"],.content-container [class *="nav"],.content-container nav,.content-container [class *="search"],.content-container [class *="menu"],.content-container [class *="print"],.content-container [class *="nocontent"],.content-container .hidden,.content-container [class *="popup"],.content-container [class *="share"],.content-container [class *="sharing"],.content-container [class *="social"],.content-container [class *="follow"],.content-container [class *="newsletter"],.content-container [class *="meta"],.content-container [class *="author"],.content-container [id *="author"],.content-container form,.content-container [class ^="form"],.content-container [class *="-form-"],.content-container [class $="form"],.content-container [class ~="form"],.content-container [class *="related"],.content-container [class *="recommended"],.content-container [class *="see-also"],.content-container [class *="popular"],.content-container [class *="trail"],.content-container [class *="comment"],.content-container [class *="disqus"],.content-container [id *="disqus"],.content-container [class ^="tag"],.content-container [class *="-tag-"],.content-container [class $="-tag"],.content-container [class $="_tag"],.content-container [class ~="tag"],.content-container [class *="-tags-"],.content-container [class $="-tags"],.content-container [class $="_tags"],.content-container [class ~="tags"],.content-container [id *="-tags-"],.content-container [id $="-tags"],.content-container [id $="_tags"],.content-container [id ~="tags"],.content-container [class *="subscribe"],.content-container [id *="subscribe"],.content-container [class *="subscription"],.content-container [id *="subscription"],.content-container [class ^="fav"],.content-container [class *="-fav-"],.content-container [class $="-fav"],.content-container [class $="_fav"],.content-container [class ~="fav"],.content-container [id ^="fav"],.content-container [id *="-fav-"],.content-container [id $="-fav"],.content-container [id $="_fav"],.content-container [id ~="fav"],.content-container [class *="favorites"],.content-container [id *="favorites"],.content-container [class *="signup"],.content-container [id *="signup"],.content-container [class *="signin"],.content-container [id *="signin"],.content-container [class *="signIn"],.content-container [id *="signIn"],.content-container footer,.content-container [class *="footer"],.content-container [id *="footer"],.content-container svg[class *="pinterest"],.content-container [class *="pinterest"] svg,.content-container svg[id *="pinterest"],.content-container [id *="pinterest"] svg,.content-container svg[class *="pinit"],.content-container [class *="pinit"] svg,.content-container svg[id *="pinit"],.content-container [id *="pinit"] svg,.content-container svg[class *="facebook"],.content-container [class *="facebook"] svg,.content-container svg[id *="facebook"],.content-container [id *="facebook"] svg,.content-container svg[class *="github"],.content-container [class *="github"] svg,.content-container svg[id *="github"],.content-container [id *="github"] svg,.content-container svg[class *="twitter"],.content-container [class *="twitter"] svg,.content-container svg[id *="twitter"],.content-container [id *="twitter"] svg,.content-container svg[class *="instagram"],.content-container [class *="instagram"] svg,.content-container svg[id *="instagram"],.content-container [id *="instagram"] svg,.content-container svg[class *="tumblr"],.content-container [class *="tumblr"] svg,.content-container svg[id *="tumblr"],.content-container [id *="tumblr"] svg,.content-container svg[class *="youtube"],.content-container [class *="youtube"] svg,.content-container svg[id *="youtube"],.content-container [id *="youtube"] svg,.content-container svg[class *="codepen"],.content-container [class *="codepen"] svg,.content-container svg[id *="codepen"],.content-container [id *="codepen"] svg,.content-container svg[class *="dribble"],.content-container [class *="dribble"] svg,.content-container svg[id *="dribble"],.content-container [id *="dribble"] svg,.content-container svg[class *="soundcloud"],.content-container [class *="soundcloud"] svg,.content-container svg[id *="soundcloud"],.content-container [id *="soundcloud"] svg,.content-container svg[class *="rss"],.content-container [class *="rss"] svg,.content-container svg[id *="rss"],.content-container [id *="rss"] svg,.content-container svg[class *="linkedin"],.content-container [class *="linkedin"] svg,.content-container svg[id *="linkedin"],.content-container [id *="linkedin"] svg,.content-container svg[class *="vimeo"],.content-container [class *="vimeo"] svg,.content-container svg[id *="vimeo"],.content-container [id *="vimeo"] svg,.content-container svg[class *="email"],.content-container [class *="email"] svg,.content-container svg[id *="email"],.content-container [id *="email"] svg{display: none;}.entry-content.entry-content,pre *{display: initial !important;}';
-                copy.appendChild(hideCSS);
-            }
-
-
-
-            const date = new Date();
-            fetch(jrDomain + "newEntry", {
-                mode: 'cors',
-                method: 'POST',
-                headers: { "Content-type": "application/json; charset=UTF-8" },
-                body: JSON.stringify({
-                    'jrSecret': jrSecret,
-                    'origURL': window.location.href,
-                    'datetime': date.getFullYear() + "-" + (date.getMonth()+1) + "-" + date.getDate() + ":" + date.getHours() + ":" + date.getMinutes() + ":" + date.getSeconds(),
-                    'title': myTitle,
-                    'author': myAuthor,
-                    'content': copy.outerHTML
-                })
-            })
-            .then(function(response) {
-                if (!response.ok) throw response;
-                else return response.text();
-            })
-            .then(function(url) {
-                if(url) {
-
-                    // Close the original page if the option is enabled
-                    if((chromeStorage["openSharedPage"] || typeof chromeStorage["openSharedPage"] === "undefined")
-                    && chromeStorage["closeOldPage"]) {
-                        chrome.runtime.sendMessage({closeTab: "true"});
-                    }
-
-                    // Open up the sharable copy if the options is enabled
-                    if((chromeStorage["openSharedPage"] || typeof chromeStorage["openSharedPage"] === "undefined")) {
-                        window.open(url, "_blank");
-                    }
-
-                    // Show the link in the dropdown
-                    shareDropdown.classList.add("active");
-                    shareDropdown.innerText = url;
-                }
-            })
-            .catch(function(err) {
-                hasSavedLink = false;
-                if(err.status === 428) {
-                    simpleArticleIframe.querySelector(".simple-share-alert").classList.add("active");
-                    window.clearTimeout(alertTimeout);
-                    alertTimeout = setTimeout(function() {
-                        simpleArticleIframe.querySelector(".simple-share-alert").classList.remove("active");
-                    }, 10000);
-                } else {
-                    console.error(`Fetch Error =\n`, err);
-                }
-            });
-        }
-    } else {
-        const notification = {
-            textContent: "To share this reader view with others, upgrade to <a href='https://justread.link/#get-Just-Read' target='_blank'>Just Read Premium</a>! Shared pages are just <em>one</em> of the additional features included.",
-            url: "https://justread.link/#get-Just-Read",
-            primaryText: "Learn more",
-            secondaryText: "Maybe later",
-        };
-        simpleArticleIframe.body.appendChild(createNotification(notification));
-    }
-}
-
-
-
-
 /////////////////////////////////////
 // Actually create the iframe
 /////////////////////////////////////
@@ -2895,7 +2768,7 @@ function createSimplifiedOverlay() {
         });
 
         // The share button
-        simpleArticleIframe.querySelector(".simple-share").addEventListener('click', getSavableLink);
+        // simpleArticleIframe.querySelector(".simple-share").addEventListener('click', getSavableLink);
         // The share dropdown
         shareDropdown = simpleArticleIframe.querySelector(".simple-share-dropdown");
 
