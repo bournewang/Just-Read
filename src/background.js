@@ -6,6 +6,7 @@ function isEmpty(obj) {
 let preventInstance = {};
 
 function startJustRead(tab) {
+    console.log(tab)
     if (tab) {
         executeScripts(tab.id);
     } else {
@@ -23,17 +24,25 @@ function executeScripts(tabId) {
     setTimeout(() => delete preventInstance[tabId], 10000);
 
     // Load our external scripts, then our content script
-    chrome.tabs.executeScript(tabId, { file: "/external-libraries/datGUI/dat.gui.min.js", allFrames: false});
-    chrome.tabs.executeScript(tabId, { file: "/external-libraries/DOMPurify/purify.min.js", allFrames: false});
-    chrome.tabs.executeScript(tabId, { file: "/external-libraries/Rangy/rangy.min.js", allFrames: false});
-    chrome.tabs.executeScript(tabId, { file: "/external-libraries/Rangy/rangy-classapplier.min.js", allFrames: false});
-    chrome.tabs.executeScript(tabId, { file: "/external-libraries/Rangy/rangy-highlighter.min.js", allFrames: false});
-    chrome.tabs.executeScript(tabId, { file: "/external-libraries/Rangy/rangy-textrange.min.js", allFrames: false});
-    chrome.tabs.executeScript(tabId, { file: "content_script.js", allFrames: false});
+    chrome.scripting.executeScript({
+        target: {tabId: tabId},
+        // matches: ["<all_urls>"],
+        files: [
+            "external-libraries/datGUI/dat.gui.min.js",
+            "external-libraries/DOMPurify/purify.min.js",
+            "external-libraries/Rangy/rangy.min.js",
+            "external-libraries/Rangy/rangy-classapplier.min.js",
+            "external-libraries/Rangy/rangy-highlighter.min.js",
+            "external-libraries/Rangy/rangy-textrange.min.js",
+            "external-libraries/jquery/jquery-3.6.0.min.js",
+            "content_script.js"
+        ]
+    });
+
 
     // Add a badge to signify the extension is in use
-    chrome.browserAction.setBadgeBackgroundColor({color:[242, 38, 19, 230]});
-    chrome.browserAction.setBadgeText({text:"on"});
+    chrome.action.setBadgeBackgroundColor({color:[242, 38, 19, 230]});
+    chrome.action.setBadgeText({text:"on"});
 
     // Check if we need to add the site to JR's autorun list
     chrome.storage.sync.get("alwaysAddAR", function(result) {
@@ -43,15 +52,16 @@ function executeScripts(tabId) {
     });
 
     setTimeout(function() {
-        chrome.browserAction.setBadgeText({text:""});
+        chrome.action.setBadgeText({text:""});
     }, 2000);
 }
 
 function startSelectText() {
-    chrome.tabs.executeScript(null, {
-        code: 'let useText = true;' // Ghetto way of signaling to select text instead of
-    }, function() {                 // using Chrome messages
-        startJustRead();
+    chrome.scripting.executeScript({target: null, function(){
+        let useText = true;
+        }, function(){
+            startJustRead();
+        }
     });
 }
 
@@ -60,8 +70,7 @@ function createPageCM() {
     pageCMId = chrome.contextMenus.create({
          title: "View this page using Just Read",
          id: "pageCM",
-         contexts: ["page"],
-         onclick: startJustRead
+         contexts: ["page"]
     });
 }
 function createLinkCM() {
@@ -69,20 +78,7 @@ function createLinkCM() {
     linkCMId = chrome.contextMenus.create({
         title: "View the linked page using Just Read",
         id: "linkCM",
-        contexts:["link"],
-        onclick: function(info, tab) {
-            chrome.tabs.create(
-                { url: info.linkUrl, active: false },
-                function(newTab) {
-                    chrome.tabs.executeScript(newTab.id, {
-                        code: 'let runOnLoad = true'
-                    }, function() {
-                        startJustRead(newTab);
-                    });
-                }
-            );
-
-        }
+        contexts:["link"]
     });
 }
 function createAutorunCM() {
@@ -91,7 +87,7 @@ function createAutorunCM() {
         title: "Add this site to Just Read's auto-run list",
         id: "autorunCM",
         contexts:["page"],
-        onclick: addSiteToAutorunList
+        // onclick: addSiteToAutorunList
     });
 }
 function addSiteToAutorunList(info, tab) {
@@ -131,61 +127,9 @@ function addSiteToAutorunList(info, tab) {
 
 
 let pageCMId = linkCMId = autorunCMId = undefined;
-function updateCMs() {
-    chrome.storage.sync.get(["enable-pageCM", "enable-linkCM", "enable-autorunCM"], function (result) {
-        let size = 0;
-
-        for(let key in result) {
-            size++;
-
-            if(key === "enable-pageCM") {
-                if(result[key]) {
-                    if(typeof pageCMId == "undefined")
-                        createPageCM();
-                } else {
-                    if(typeof pageCMId != "undefined") {
-                        chrome.contextMenus.remove("pageCM");
-                        pageCMId = undefined;
-                    }
-                }
-            }
-            else if(key === "enable-linkCM") {
-                if(result[key]) {
-                    if(typeof linkCMId == "undefined")
-                        createLinkCM();
-                } else {
-                    if(typeof linkCMId != "undefined") {
-                        chrome.contextMenus.remove("linkCM");
-                        linkCMId = undefined;
-                    }
-                }
-            }
-            else if(key === "enable-autorunCM") {
-                if(result[key]) {
-                    if(typeof autorunCMId == "undefined")
-                        createAutorunCM();
-                } else {
-                    if(typeof autorunCMId != "undefined") {
-                        chrome.contextMenus.remove("autorunCM");
-                        autorunCMId = undefined;
-                    }
-                }
-            }
-        }
-
-        if(size === 0) {
-            createPageCM();
-            createLinkCM();
-            createAutorunCM();
-        }
-    });
-}
 
 // Listen for the extension's click
-chrome.browserAction.onClicked.addListener(startJustRead);
-
-// Add our context menus
-updateCMs();
+chrome.action.onClicked.addListener(startJustRead);
 
 // Listen for the keyboard shortcut
 chrome.commands.onCommand.addListener(function(command) {
@@ -200,8 +144,8 @@ let lastClosed = Date.now();
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     if(request === "Open options") {
         chrome.runtime.openOptionsPage();
-    } else if(request.updateCMs === "true") {
-        updateCMs();
+    // } else if(request.updateCMs === "true") {
+        // updateCMs();
     } else if(request.closeTab === "true") {
         chrome.tabs.getSelected(function(tab) {
             setTimeout(function() { chrome.tabs.remove(tab.id) }, 100);
@@ -256,11 +200,43 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 // Create an entry to allow user to select an element to read from
 chrome.contextMenus.create({
     title: "Select content to read",
-    contexts: ["browser_action"],
-    onclick: function() {
+    id: "select-to-read"
+});
+
+chrome.contextMenus.create({
+    title: "Main Page",
+    id: "main",
+    // contexts: ["link"],
+//     onclick : function(){
+//         chrome.tabs.create({ url: "main.html" });
+//     }
+});
+
+
+chrome.contextMenus.onClicked.addListener(function(itemData) {
+    if (itemData.menuItemId == 'main') {
+        chrome.tabs.create({ url: "main.html" });
+    }else if (itemData.menuItemId == "select-to-read") {
         startSelectText();
+    } else if(itemData.menuItemId == 'pageCM') {
+        startJustRead();
+    } else if (itemData.menuItemId == 'linkCM') {
+        // onclick: function(info, tab) {
+        chrome.tabs.create(
+            { url: info.linkUrl, active: false },
+            function(newTab) {
+                chrome.tabs.executeScript(newTab.id, {
+                    code: 'let runOnLoad = true'
+                }, function() {
+                    startJustRead(newTab);
+                });
+            }
+        );
+    } else if (itemData.menuItemId == 'autorunCM') {
+        addSiteToAutorunList()
     }
 });
+
 
 chrome.tabs.onUpdated.addListener( function (tabId, changeInfo, tab) {
     if(preventInstance[tabId]) return;

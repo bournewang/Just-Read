@@ -1,0 +1,44 @@
+.wrapper {
+  height: 100%;
+  overflow-y: hidden;
+  #content {
+    height: 90vh;
+    border: 1px solid lightgray;
+
+    .date-range{
+      .active{background: lightskyblue;}
+      .date{padding: .2em;}
+      border-right: 1px solid lightgray;
+    }
+
+    > div {
+      //border: 1px solid black;
+      overflow-x: hidden;
+      height: 100%;
+    }
+
+    .articles {
+      height: 100%;
+      overflow-y: scroll;
+      border-right: 1px solid lightgray;
+      .article {
+        padding: .2em;
+        .date {
+          font-size: .8em;
+          color: gray;
+          display: block;
+        }
+        .highlight{
+          font-size: .9em;
+          background: yellow;
+          display: block;
+        }
+      }
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+    }
+  }
+}

@@ -1,13 +1,13 @@
 {
-  "name": "Just Read",
+  "name": "Just Read V3",
   "version": "5.2.5",
-  "manifest_version": 2,
+  "manifest_version": 3,
   "description": "A feature-packed, customizable reader extension.",
   "homepage_url": "https://github.com/ZachSaucier/Just-Read",
 
-  "browser_action": {
+  "action": {
     "default_icon": "icons/icon19.png",
-    "default_title": "Just Read"
+    "default_title": "Just Read V3"
   },
 
   "icons": {
@@ -32,35 +32,33 @@
   },
 
   "background": {
-    "scripts": ["background.js"]
+    "service_worker": "background.js"
   },
 
   "options_ui": {
-    "page": "options.html",
+    "page": "main.html",
     "open_in_tab": true
   },
 
-  "web_accessible_resources": [
-    "print.svg",
-    "required-styles.css",
-    "default-styles.css",
-    "dark-styles.css",
-    "hide-segments.css",
-    "page.css",
-    "options.js",
-    "options.css",
-    "fonts/*"
-  ],
-
-  "content_scripts": [{
-    "matches": ["https://justread.link/*"],
-    "js": ["messager.js"]
+  "web_accessible_resources": [{
+    "resources": [
+      "print.svg",
+      "required-styles.css",
+      "default-styles.css",
+      "dark-styles.css",
+      "hide-segments.css",
+      "page.css",
+      "options.js",
+      "options.css",
+      "fonts/*"
+    ],
+    "matches": ["<all_urls>"]
   }],
-
   "permissions": [
     "tabs",
-    "*://*/*",
+    "activeTab",
     "contextMenus",
+    "scripting",
     "storage"
   ]
 }

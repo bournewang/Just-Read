@@ -12,7 +12,7 @@ chrome.storage.sync.get(null, function (result) {
     launch();
 });
 
-
+let current_article = null;
 /////////////////////////////////////
 // Generic helper functions
 /////////////////////////////////////
@@ -1524,10 +1524,28 @@ function handleEnd(e) {
 
         highlightPicker = editBar.querySelector(".jr-highlight-picker");
         editBar.querySelector(".jr-highlight-color").addEventListener("click", function(e) {
-            hidePickers();
-            highlightSelectedText(lastHighlightColor);
-            highlightPicker.style.display = "block";
-            e.stopPropagation();
+            highlightSelectedText("yellow");
+            console.log("all highlight words: ")
+            var highlight = []
+            simpleArticleIframe.querySelectorAll(".jr-highlight-yellow").forEach(function(ele){
+                console.log(ele.innerText)
+                highlight.push(ele.innerText)
+            })
+            let highlight_str = highlight.filter(e => !!e).join(",")
+            $.ajax({
+                url: "http://localhost:4567/articles/"+current_article.id,
+                data: {highlight: highlight_str},
+                type: 'PUT',
+                success: function (res) {
+                    // Do something with the result
+                    console.log(res)
+                }
+            });
+
+            // hidePickers();
+            // highlightSelectedText(lastHighlightColor);
+            // highlightPicker.style.display = "block";
+            // e.stopPropagation();
         });
         highlightPicker.querySelectorAll(".jr-color-swatch").forEach(function(swatch) {
             swatch.addEventListener("click", function(e) {
@@ -2894,6 +2912,47 @@ function createSimplifiedOverlay() {
         setTimeout(() => checkBreakpoints(), 10);
 
         finishLoading();
+
+        var articleDoc = simpleArticleIframe.getRootNode().documentElement.cloneNode(true)
+        articleDoc.querySelector(".simple-ui-container").remove()
+        articleDoc.querySelector(".simple-meta .simple-date").remove()
+        articleDoc.querySelector(".simple-meta .simple-author").remove()
+        articleDoc.querySelector(".simple-find").remove()
+
+        // var formData = new FormData();
+        // formData.append("ori_url", window.location.href);
+        // formData.append("content", articleDoc.outerHTML.toString());
+        const myTitle = articleDoc.querySelector(".simple-title") ? articleDoc.querySelector(".simple-title").innerText : "",
+            myAuthor = articleDoc.querySelector(".simple-author") ? articleDoc.querySelector(".simple-author").innerText : "";
+
+        $.post("http://localhost:4567/upload", {
+            "ori_url": window.location.href,
+            "content": articleDoc.outerHTML.toString()
+        }, function (res) {
+            console.log("upload response ==== =")
+            console.log(res)
+            var ret = JSON.parse(res)
+            if (ret.success && ret.url) {
+                console.log("request articles data: ")
+                var data = {
+                    "title": myTitle,
+                    "author": myAuthor,
+                    "url": ret.url,
+                    "ori_url": window.location.href,
+                };
+                console.log(data)
+                $.post("http://localhost:4567/articles", data, function (res) {
+                    console.log(res)
+                    current_article = JSON.parse(res)
+                })
+            }
+        });
+        // $.post("https://vocabulary-master.local/article.php", {
+        //         origURL: window.location.href,
+        //         content: simpleArticleIframe.getRootNode().documentElement.outerHTML
+        //     }, function(res){
+        //     console.log(res.data)
+        // });
     }
 
     // Fix a bug in FF
