@@ -8,8 +8,9 @@
         <div v-for="(date,i ) in date_range" @click="loadList(date)" class="date" :class="current_date == date ? 'active' : ''">{{date}}</div>
       </div>
       <div class="col-3">
-        <div class="articles">
-          <div class="article" v-for="(article,i) in articles" @click="loadArticle(article)">
+        <div class="loading" v-if="loading_list">Loading...</div>
+        <div class="articles" v-else>
+          <div v-for="(article,i) in articles" class="article" :class="current_article.id == article.id ? 'active' : ''" @click="loadArticle(article)">
 <!--            <a :href="article.url" target="article-content">{{article.title}}</a>-->
             <span class="title">{{article.title}}</span>
 <!--            <span class="highlight">{{article.highlight}}</span>-->
@@ -23,7 +24,8 @@
 
       </div>
       <div class="col-7">
-        <div class="article-content" v-html="article_content"></div>
+        <div v-if="loading_content" class="loading">Loading</div>
+        <div v-else class="article-content" v-html="article_content"></div>
       </div>
     </div>
   </div>
@@ -37,7 +39,10 @@ export default {
       articles: [],
       article_content: null,
       date_range: [],
-      current_date: null
+      loading_content: false,
+      loading_list: false,
+      current_date: null,
+      current_article: {}
     }
   },
   created() {
@@ -59,13 +64,17 @@ export default {
     loadList(date) {
       var that = this
       this.current_date = date
+      this.loading_list = true
       axios.get("http://localhost:4567/articles"+ (date ? "?date="+date : "")).then(function(res){
         console.log(res.data);
         that.articles = res.data
+        that.loading_list = false
       })
     },
     loadArticle(article){
       var that = this
+      this.loading_content = true
+      this.current_article = article
       axios.get(article.url).then(function(res){
         // console.log(res.data);
         let html = res.data
@@ -79,6 +88,7 @@ export default {
         }
 
         that.article_content = html
+        that.loading_content = false
       })
     }
   }

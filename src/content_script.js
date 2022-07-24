@@ -1529,23 +1529,13 @@ function handleEnd(e) {
             var highlight = []
             simpleArticleIframe.querySelectorAll(".jr-highlight-yellow").forEach(function(ele){
                 console.log(ele.innerText)
-                highlight.push(ele.innerText)
+                highlight.push(ele.innerText.trim())
             })
             let highlight_str = highlight.filter(e => !!e).join(",")
-            $.ajax({
-                url: "http://localhost:4567/articles/"+current_article.id,
-                data: {highlight: highlight_str},
-                type: 'PUT',
-                success: function (res) {
-                    // Do something with the result
-                    console.log(res)
-                }
-            });
-
-            // hidePickers();
-            // highlightSelectedText(lastHighlightColor);
-            // highlightPicker.style.display = "block";
-            // e.stopPropagation();
+            chrome.runtime.sendMessage({
+                eventType: "highlight",
+                highlight: highlight_str
+            })
         });
         highlightPicker.querySelectorAll(".jr-color-swatch").forEach(function(swatch) {
             swatch.addEventListener("click", function(e) {
@@ -2083,129 +2073,14 @@ function gradientText(colors) {
     });
 }
 
-// Custom search/find functionality
-function createFindBar() {
-    const simpleFind = document.createElement("div");
-    simpleFind.className = "simple-find";
-
-    const findInput = document.createElement("input");
-    findInput.className = "simple-find-input";
-    findInput.setAttribute("type", "text");
-
-    const findCount = document.createElement("span");
-    findCount.className = "simple-find-count";
-    findCount.innerText = 0;
-
-    const findClose = document.createElement("button");
-    findClose.className = "simple-close-find";
-    findClose.setAttribute("title", "Close find bar");
-    findClose.setAttribute("tabindex", "0");
-    findClose.innerText = "X";
-
-    simpleFind.appendChild(findInput);
-    simpleFind.appendChild(findCount);
-    simpleFind.appendChild(findClose);
-
-    return simpleFind;
-}
-
 let find,
     findInput,
     findCount,
     closeFind;
 
 let searchResultApplier;
-function initFindBar() {
-    find = simpleArticleIframe.querySelector(".simple-find");
-    findInput = find.querySelector(".simple-find-input");
-    findCount = find.querySelector(".simple-find-count");
-    closeFind = find.querySelector(".simple-close-find");
-
-    searchResultApplier = rangy.createClassApplier("simple-found");
-
-    findInput.addEventListener("keydown", function(e) {
-        // Esc
-        if(e.key === "Escape") {
-            closeFindBar();
-            e.stopPropagation();
-        }
-
-        else if(!e.ctrlKey) {
-            scheduleSearch();
-        }
-    });
-
-    findInput.addEventListener("keyup", e => { if(!e.ctrlKey) scheduleSearch });
-    closeFind.onclick = closeFindBar;
-}
-
-function closeFindBar() {
-    find.classList.remove("active");
-
-    cancelSearch();
-}
 
 let timer = null;
-function scheduleSearch() {
-    if (timer) {
-        window.clearTimeout(timer);
-    }
-    timer = window.setTimeout(doSearch, 100);
-}
-
-function cancelSearch() {
-    // Remove existing highlights
-    const range = rangy.createRange();
-    const searchScopeRange = rangy.createRange();
-    searchScopeRange.selectNodeContents(simpleArticleIframe.querySelector(".content-container"));
-
-    range.selectNodeContents(simpleArticleIframe.querySelector(".content-container"));
-    searchResultApplier.undoToRange(range);
-}
-
-function doSearch() {
-    if(find.classList.contains("active")) {
-        // Remove existing highlights
-        const range = rangy.createRange();
-        const searchScopeRange = rangy.createRange();
-        searchScopeRange.selectNodeContents(simpleArticleIframe.querySelector(".content-container"));
-
-        const options = {
-            caseSensitive: false,
-            wholeWordsOnly: false,
-            withinRange: searchScopeRange,
-            direction: "forward" // This is redundant because "forward" is the default
-        };
-
-        range.selectNodeContents(simpleArticleIframe.querySelector(".content-container"));
-        searchResultApplier.undoToRange(range);
-
-        // Create search term
-        const searchTerm = findInput.value;
-
-        if (searchTerm !== "") {
-            // Iterate over matches
-            while (range.findText(searchTerm, options)) {
-                // range now encompasses the first text match
-                searchResultApplier.applyToRange(range);
-
-                // Collapse the range to the position immediately after the match
-                range.collapse(false);
-            }
-
-            findCount.innerText = simpleArticleIframe.querySelectorAll(".simple-found").length;
-            findCount.classList.add("active");
-
-            // Jump to the first found instance
-            if(simpleArticleIframe.querySelector(".simple-found"))
-                simpleArticleIframe.querySelector(".simple-found").scrollIntoView();
-        } else {
-            findCount.classList.remove("active");
-        }
-
-        timer = null;
-    }
-}
 
 // Auto-scroll functionality
 let scrollSpeed = 0.5,
@@ -2414,6 +2289,7 @@ let titleSelector,
 let savedComments, savedCompactComments;
 
 function getDomainSelectors() {
+    console.log("====== content script: getDomainSelectors");
     // Get custom domain selectors if applicable
     if(chromeStorage['domainSelectors']) {
         let domainSelectorArr = chromeStorage['domainSelectors'];
@@ -2464,6 +2340,7 @@ function getDomainSelectors() {
 }
 
 function createSimplifiedOverlay() {
+    console.log("====== content script: createSimplifiedOverlay");
     // Disable scroll on main page until closed
     document.documentElement.classList.add("simple-no-scroll");
 
@@ -2690,8 +2567,6 @@ function createSimplifiedOverlay() {
 
     container.appendChild(uiContainer);
 
-    // Add the find bar
-    container.appendChild(createFindBar());
 
     // Add our iframe to the page
     document.body.appendChild(simpleArticle);
@@ -2721,7 +2596,7 @@ function createSimplifiedOverlay() {
         compactComments.innerHTML = DOMPurify.sanitize(savedCompactComments);
     }
 
-    function doStuff() {
+    // function doStuff() {
         simpleArticleIframe = document.getElementById("simple-article").contentWindow.document;
         simpleArticleIframe.body.appendChild(container);
         simpleArticleIframe.documentElement.setAttribute('lang', document.documentElement.getAttribute('lang'));
@@ -2914,54 +2789,23 @@ function createSimplifiedOverlay() {
         finishLoading();
 
         var articleDoc = simpleArticleIframe.getRootNode().documentElement.cloneNode(true)
-        articleDoc.querySelector(".simple-ui-container").remove()
-        articleDoc.querySelector(".simple-meta .simple-date").remove()
-        articleDoc.querySelector(".simple-meta .simple-author").remove()
-        articleDoc.querySelector(".simple-find").remove()
+        var tools = articleDoc.querySelector(".simple-ui-container");
+        tools ? tools.remove() : "";
+        // articleDoc.querySelector(".simple-meta .simple-date").remove()
+        // articleDoc.querySelector(".simple-meta .simple-author").remove()
+        var find = articleDoc.querySelector(".simple-find");
+        find ? find.remove() : "";
 
-        // var formData = new FormData();
-        // formData.append("ori_url", window.location.href);
-        // formData.append("content", articleDoc.outerHTML.toString());
         const myTitle = articleDoc.querySelector(".simple-title") ? articleDoc.querySelector(".simple-title").innerText : "",
             myAuthor = articleDoc.querySelector(".simple-author") ? articleDoc.querySelector(".simple-author").innerText : "";
 
-        $.post("http://localhost:4567/upload", {
-            "ori_url": window.location.href,
-            "content": articleDoc.outerHTML.toString()
-        }, function (res) {
-            console.log("upload response ==== =")
-            console.log(res)
-            var ret = JSON.parse(res)
-            if (ret.success && ret.url) {
-                console.log("request articles data: ")
-                var data = {
-                    "title": myTitle,
-                    "author": myAuthor,
-                    "url": ret.url,
-                    "ori_url": window.location.href,
-                };
-                console.log(data)
-                $.post("http://localhost:4567/articles", data, function (res) {
-                    console.log(res)
-                    current_article = JSON.parse(res)
-                })
-            }
+        chrome.runtime.sendMessage({
+            eventType: "articleFinishLoading",
+            ori_url: window.location.href.replace("&jr=on","").replace("?jr=on",""),
+            title: myTitle,
+            author: myAuthor,
+            content: articleDoc.outerHTML.toString()
         });
-        // $.post("https://vocabulary-master.local/article.php", {
-        //         origURL: window.location.href,
-        //         content: simpleArticleIframe.getRootNode().documentElement.outerHTML
-        //     }, function(res){
-        //     console.log(res.data)
-        // });
-    }
-
-    // Fix a bug in FF
-    if(navigator.userAgent.toLowerCase().indexOf('firefox') > -1) {
-        setTimeout(doStuff, 100);
-    } else {
-        doStuff();
-    }
-
 }
 
 
@@ -2969,6 +2813,7 @@ function createSimplifiedOverlay() {
 let theme,
     styleElem;
 function continueLoading() {
+    console.log("====== content script: continueLoading");
     // Create a style tag and place our styles in there from localStorage
     styleElem = document.createElement('style');
 
@@ -3088,12 +2933,6 @@ function finishLoading() {
     // Attempt to mute the elements on the original page
     mutePage();
 
-    // Initiate JRP's find functionality
-    if(typeof chromeStorage['findbar'] === "undefined"
-    || chromeStorage['findbar']) {
-        initFindBar();
-    }
-
     // Allow content to be removed if enabled
     if(chromeStorage['remove-orig-content']) {
         removeOrigContent = true;
@@ -3111,6 +2950,7 @@ const stylesheetObj = {},
       stylesheetVersion = 4.1; // THIS NUMBER MUST BE UPDATED FOR THE STYLESHEETS TO KNOW TO UPDATE
 
 function launch() {
+    console.log("====== content-script : launch ")
     // Detect past overlay - don't show another
     if(document.getElementById("simple-article") == null) {
 

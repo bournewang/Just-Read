@@ -4,9 +4,10 @@ function isEmpty(obj) {
 }
 
 let preventInstance = {};
+let tabArticles = {}; // {tabId: article}
 
 function startJustRead(tab) {
-    console.log(tab)
+    console.log("====== background : startJustRead, tab: "+tab.id)
     if (tab) {
         executeScripts(tab.id);
     } else {
@@ -18,6 +19,7 @@ function startJustRead(tab) {
 }
 
 function executeScripts(tabId) {
+    console.log("====== background: " + tabId)
     if (preventInstance[tabId]) return;
 
     preventInstance[tabId] = true;
@@ -142,6 +144,8 @@ chrome.commands.onCommand.addListener(function(command) {
 // Listen for messages
 let lastClosed = Date.now();
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+    console.log("======== background: onMessage ")
+    console.log(request)
     if(request === "Open options") {
         chrome.runtime.openOptionsPage();
     // } else if(request.updateCMs === "true") {
@@ -194,6 +198,45 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
                 }
             });
         }
+    }
+    else if (request.eventType == "articleFinishLoading") {
+        // 1. check if the ori_url is already created a articles
+        fetch("http://localhost:4567/articles/check/exists?ori_url="+request.ori_url, {
+            method: 'GET',
+            mode: 'cors',
+        })
+            .then(res => res.json())
+            .then(res => {
+            if (res.success) {
+                tabArticles[sender.tab.id] = res.data
+            }else{
+                // 2. create article if not created before
+                fetch("http://localhost:4567/upload", {
+                    method: 'POST',
+                    mode: 'cors',
+                    body: JSON.stringify({
+                        title: request.title,
+                        author: request.author,
+                        ori_url: request.ori_url,
+                        content: request.content
+                    })
+                })
+                    .then(res => res.json())
+                    .then(res => {
+                    tabArticles[sender.tab.id] = res.data
+                })
+            }
+        })
+    }
+    else if (request.eventType == "highlight") {
+        var article = tabArticles[sender.tab.id]
+        fetch("http://localhost:4567/articles/"+article.id, {
+            method: 'PUT',
+            mode: 'cors',
+            body: JSON.stringify({
+                highlight: request.highlight
+            })
+        })
     }
 });
 
