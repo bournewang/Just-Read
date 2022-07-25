@@ -1,0 +1,85 @@
+#vocabulary-master-wrapper{
+  //position: fixed;
+  //right: 1em;
+  border-left: 1px solid lightgray;
+  //background: whitesmoke;
+  padding: 2px;
+  z-index: 9999;
+  font-family: monospace;
+  font-size: 14px;
+  padding: .5em;
+  //overflow-y: scroll;
+
+  &.max{
+    top: 1em;
+    //width: 25vw !important;
+    #title{
+      font-size: 1.5em;
+    }
+  }
+
+  &.mini{
+    bottom: 1em;
+    //padding: 1px;
+    //width: 2em;
+    //height: 2em !important;
+
+    #title{
+      font-size: 1em;
+    }
+  }
+
+  button{
+    font-size: 1em;
+    border: 1px solid lightgray;
+    border-radius: .2em;
+    &.button-primary{
+      color: white;
+      background-color: #337ab7;
+      border-color: #2e6da4;
+    }
+    &.autoplay-btn {
+      font-size: .8em;
+    }
+  }
+
+  audio{
+    display: none;
+  }
+  img.play-btn {
+    width: 1em;
+  }
+
+  #meanings {
+    max-height: 30vh;
+    overflow-y: scroll;
+    width: 96%;
+
+    .meaning {
+      margin-top: .3em;
+      .phonetic {
+        padding-left: .5em;
+      }
+      .partOfSpeech {
+        color: darkred;
+      }
+
+      .definition {
+      }
+
+      .example {
+        color: #25D084;
+      }
+
+      .synonyms {
+        color: #3f51b5;
+        font-weight: bold;
+      }
+    }
+  }
+
+  #examples{
+    max-height: 65vh;
+    overflow-y: scroll;
+  }
+}

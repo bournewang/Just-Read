@@ -26,6 +26,7 @@
     "/dist/external-libraries/ace/worker-css.js": "/dist/external-libraries/ace/worker-css.js",
     "/dist/external-libraries/datGUI/dat.gui.min.js": "/dist/external-libraries/datGUI/dat.gui.min.js",
     "/dist/external-libraries/jquery/jquery-3.6.0.min.js": "/dist/external-libraries/jquery/jquery-3.6.0.min.js",
+    "/dist/js/content.js": "/dist/js/content.js",
     "/dist/background.js": "/dist/background.js",
     "/dist/content_script.js": "/dist/content_script.js",
     "/dist/messager.js": "/dist/messager.js",
@@ -38,5 +39,6 @@
     "/dist/required-styles.css": "/dist/required-styles.css",
     "/dist/main.html": "/dist/main.html",
     "/dist/options.html": "/dist/options.html",
-    "/dist/manifest.json": "/dist/manifest.json"
+    "/dist/manifest.json": "/dist/manifest.json",
+    "/dist/icons/music-32.png": "/dist/icons/music-32.png"
 }
